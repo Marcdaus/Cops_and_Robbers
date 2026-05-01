@@ -174,12 +174,7 @@ public class Controller : MonoBehaviour
         tiles[clickedTile].current = true;
         FindSelectableTiles(false);
 
-        /*TODO: Cambia el código de abajo para hacer lo siguiente
-        - Elegimos una casilla aleatoria entre las seleccionables que puede ir el caco
-        - Movemos al caco a esa casilla
-        - Actualizamos la variable currentTile del caco a la nueva casilla
-        */
-        
+        // Recopilamos todas las casillas a las que podemos ir
         List<Tile> selectableTiles = new List<Tile>();
         foreach (Tile t in tiles)
         {
@@ -189,21 +184,113 @@ public class Controller : MonoBehaviour
             }
         }
 
-        
+        // Lógica del Ladrón
         if (selectableTiles.Count > 0)
         {
-            int randomIndex = Random.Range(0, selectableTiles.Count);
-            Tile targetTile = selectableTiles[randomIndex];
+            List<Tile> bestTiles = new List<Tile>();
+            int maxMinDistance = -1;
+            int maxSumDistance = -1;
+
+            // Evaluamos cada una de las casillas candidatas
+            foreach (Tile candidate in selectableTiles)
+            {
+                // Usamos BFS para ver a qué distancia quedan los polis desde esta casilla
+                int[] distances = GetDistancesToCops(candidate.numTile);
+
+                // a qué distancia está el policía que nos pilla más cerca
+                int minDistToCop = Mathf.Min(distances[0], distances[1]);
+                // Calculamos la distancia sumada a ambos para usarla de desempate
+                int sumDistToCops = distances[0] + distances[1];
+
+                // Si esta casilla nos aleja más del poli más cercano, es nuestra nueva prioridad
+                if (minDistToCop > maxMinDistance)
+                {
+                    maxMinDistance = minDistToCop;
+                    maxSumDistance = sumDistToCops;
+                    bestTiles.Clear();
+                    bestTiles.Add(candidate);
+                }
+                // si nos aleja lo mismo del más cercano
+                else if (minDistToCop == maxMinDistance)
+                {
+                    // la casilla que en total nos aleje más de AMBOS policías
+                    if (sumDistToCops > maxSumDistance)
+                    {
+                        maxSumDistance = sumDistToCops;
+                        bestTiles.Clear();
+                        bestTiles.Add(candidate);
+                    }
+                    // Si son igual de buenas
+                    else if (sumDistToCops == maxSumDistance)
+                    {
+                        bestTiles.Add(candidate);
+                    }
+                }
+            }
+
+            // Si hay varias opciones empatadas elegimos una al azar entre ellas
+            int randomIndex = Random.Range(0, bestTiles.Count);
+            Tile targetTile = bestTiles[randomIndex];
 
             robber.GetComponent<RobberMove>().currentTile = targetTile.numTile;
             robber.GetComponent<RobberMove>().MoveToTile(targetTile);
         }
         else
         {
+            // En el caso de estar rodeado
             robber.GetComponent<RobberMove>().MoveToTile(tiles[clickedTile]);
         }
     }
-  
+
+    // Nueva función BFS para calcular la distancia desde una casilla a ambos policías
+    public int[] GetDistancesToCops(int startIndex)
+    {
+        // Usamos un array para llevar la cuenta de las distancias. -1 significa "no visitado".
+        int[] dist = new int[Constants.NumTiles];
+        for (int i = 0; i < Constants.NumTiles; i++) dist[i] = -1;
+
+        Queue<int> queue = new Queue<int>();
+        queue.Enqueue(startIndex);
+        dist[startIndex] = 0;
+
+        int cop0Tile = cops[0].GetComponent<CopMove>().currentTile;
+        int cop1Tile = cops[1].GetComponent<CopMove>().currentTile;
+
+        int distCop0 = -1;
+        int distCop1 = -1;
+        int foundCops = 0;
+
+        // Ejecutamos el BFS hasta que encontremos a ambos policías
+        while (queue.Count > 0 && foundCops < 2)
+        {
+            int current = queue.Dequeue();
+
+            // Si encontramos al policía 0 y no lo habíamos encontrado antes
+            if (current == cop0Tile && distCop0 == -1)
+            {
+                distCop0 = dist[current];
+                foundCops++;
+            }
+            // Si encontramos al policía 1 y no lo habíamos encontrado antes
+            if (current == cop1Tile && distCop1 == -1)
+            {
+                distCop1 = dist[current];
+                foundCops++;
+            }
+
+            foreach (int adj in tiles[current].adjacency)
+            {
+                if (dist[adj] == -1)
+                {
+                    dist[adj] = dist[current] + 1;
+                    queue.Enqueue(adj);
+                }
+            }
+        }
+
+        return new int[] { distCop0, distCop1 };
+    }
+
 
     public void EndGame(bool end)
     {
