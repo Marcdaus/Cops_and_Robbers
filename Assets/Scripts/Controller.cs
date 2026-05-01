@@ -179,6 +179,10 @@ public class Controller : MonoBehaviour
         - Movemos al caco a esa casilla
         - Actualizamos la variable currentTile del caco a la nueva casilla
         */
+
+
+
+
         robber.GetComponent<RobberMove>().MoveToTile(tiles[robber.GetComponent<RobberMove>().currentTile]);
     }
 
@@ -222,36 +226,67 @@ public class Controller : MonoBehaviour
 
     public void FindSelectableTiles(bool cop)
     {
-                 
-        int indexcurrentTile;        
+        int indexcurrentTile;
 
-        if (cop==true)
+        if (cop == true)
             indexcurrentTile = cops[clickedCop].GetComponent<CopMove>().currentTile;
         else
             indexcurrentTile = robber.GetComponent<RobberMove>().currentTile;
 
-        //La ponemos rosa porque acabamos de hacer un reset
         tiles[indexcurrentTile].current = true;
 
-        //Cola para el BFS
+        // Cola para el BFS
         Queue<Tile> nodes = new Queue<Tile>();
 
-        //TODO: Implementar BFS. Los nodos seleccionables los ponemos como selectable=true
-        //Tendrás que cambiar este código por el BFS
-        for(int i = 0; i < Constants.NumTiles; i++)
+        // Inicializamos el nodo de partida
+        tiles[indexcurrentTile].visited = true;
+        tiles[indexcurrentTile].distance = 0;
+        nodes.Enqueue(tiles[indexcurrentTile]);
+
+        // Identificamos la posición del otro policía
+        int otherCopTile = -1;
+        if (cop)
         {
-            tiles[i].selectable = true;
+            int otherCopId = (clickedCop == 0) ? 1 : 0;
+            otherCopTile = cops[otherCopId].GetComponent<CopMove>().currentTile;
         }
 
+        // Implementación del BFS
+        while (nodes.Count > 0)
+        {
+            Tile t = nodes.Dequeue();
 
+            // Si ya llegamos a la distancia máxima permitida, no añadimos más vecinos
+            if (t.distance >= Constants.Distance) continue;
+
+            foreach (int adjIndex in t.adjacency)
+            {
+                Tile adjTile = tiles[adjIndex];
+
+                if (!adjTile.visited)
+                {
+                    // un policía no puede pasar por la casilla del otro policía
+                    if (cop && adjIndex == otherCopTile) continue;
+
+                    adjTile.visited = true;
+                    adjTile.parent = t;
+                    adjTile.distance = t.distance + 1;
+
+                    // Marcamos como seleccionable
+                    adjTile.selectable = true;
+
+                    nodes.Enqueue(adjTile);
+                }
+            }
+        }
     }
-    
-   
-    
 
-    
 
-   
 
-       
+
+
+
+
+
+
 }
